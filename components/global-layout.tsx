@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { AudioOutlined, LeftOutlined, GithubOutlined, PlayCircleOutlined, StopOutlined, LoadingOutlined } from '@ant-design/icons';
+import { AudioOutlined, LeftOutlined, GithubOutlined, PlayCircleOutlined, StopOutlined, LoadingOutlined, BulbOutlined, EditOutlined } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { Layout, Menu, theme, ConfigProvider, Flex, App, Button, message } from 'antd';
 import clsx from 'clsx';
@@ -27,6 +27,8 @@ function getItem(
 
 const items: MenuItem[] = [
 	getItem('Stream Realtime', '/live', <AudioOutlined />),
+	getItem('语义分析', '/semantic', <BulbOutlined />),
+	getItem('雅思口语分析', '/ielts', <EditOutlined />),
 ];
 
 const subItems: MenuItem[] = [getItem('Github', '/github', <GithubOutlined />)];
@@ -59,7 +61,7 @@ const GlobalLayout: React.FC<{
 			} else {
 				setVoskStatus('stopped');
 			}
-		} catch (error) {
+		} catch {
 			setVoskStatus('stopped');
 		}
 	};
@@ -83,7 +85,7 @@ const GlobalLayout: React.FC<{
 				setVoskStatus('error');
 				message.error('启动Vosk服务失败: ' + (data.error || data.details || '未知错误'));
 			}
-		} catch (error) {
+		} catch {
 			setVoskStatus('error');
 			message.error('启动Vosk服务失败');
 		}
@@ -107,7 +109,7 @@ const GlobalLayout: React.FC<{
 			} else {
 				message.error('停止Vosk服务失败: ' + (data.error || data.details || '未知错误'));
 			}
-		} catch (error) {
+		} catch {
 			message.error('停止Vosk服务失败');
 		}
 	};
