@@ -26,6 +26,7 @@ import VolMeterWorket from "../lib/worklets/vol-meter";
 import { GenerativeContentBlob, Part } from "@google/generative-ai";
 import { nanoid } from 'nanoid'
 import { useVoskRecognition } from './use-vosk-recognition';
+import { useMicVosk } from './use-mic-vosk';
 
 
 export type UseLiveAPIResults = {
@@ -42,6 +43,7 @@ export type UseLiveAPIResults = {
   setOutputMode: (mode: string) => void;
   transcribedText: string;
   setSpeechToTextEnabled: (enabled: boolean) => void;
+  micTranscribedText: string;
 };
 
 export function useLiveAPI({
@@ -67,6 +69,7 @@ export function useLiveAPI({
   const [currentTranscriptMessage, setCurrentTranscriptMessage] = useState<ServerContentMessage | null>(null);
   // 转写文本状态
   const [transcribedText, setTranscribedText] = useState<string>('');
+  const [micTranscribedText, setMicTranscribedText] = useState<string>('');
   // Vosk语音识别
   console.log('🔧 useLiveAPI - Vosk配置:', { 
     outputMode, 
@@ -99,6 +102,24 @@ export function useLiveAPI({
   });
   
   console.log('🔧 useLiveAPI - Vosk状态:', { isReady, error, hasProcessAudioData: !!processAudioData });
+  // 麦克风->Vosk 识别（基于 RealtimeInput 的音频块）
+  const { feedBase64: feedMicBase64, flush: flushMic, isReady: micReady, partialText: micPartial } = useMicVosk({
+    enabled: speechToTextEnabled,
+    onPartial: (t) => setMicTranscribedText(t),
+    onResult: (t) => {
+      setMicTranscribedText('');
+      // 将最终识别文本作为一条用户消息（右侧头像）加入历史
+      setCurrentUserMessage({
+        clientContent: {
+          turns: [{ role: 'user', parts: [{ text: t }] } as any],
+          turnComplete: true,
+        },
+        id: nanoid(),
+      });
+    },
+    onError: (err) => console.error('[Mic->Vosk] error:', err),
+  });
+  const micFlushTimerRef = useRef<number | null>(null);
   // 服务端返回的语音，一方面直接播放，另一方面需要保存起来，结束的时候，生成一个播放地址
   const botAudioParts = useRef<Part[]>([]);
   const botContentParts = useRef<Part[]>([]);
@@ -176,6 +197,24 @@ export function useLiveAPI({
     const onInput = (data: RealtimeInputMessage | ClientContentMessage) => {
       if ((data as RealtimeInputMessage)?.realtimeInput?.mediaChunks) {
         mediaChunks.current?.push(...(data as RealtimeInputMessage)?.realtimeInput?.mediaChunks)
+        // 将音频块送入本地 Vosk（麦克风转写）
+        const chunks = (data as RealtimeInputMessage).realtimeInput.mediaChunks || [];
+        for (const ch of chunks) {
+          if (ch.mimeType && ch.mimeType.includes('audio') && ch.data) {
+            try {
+              feedMicBase64(ch.data);
+              // 基于静默的简单去抖：每次有音频就重置计时，超时后触发 flush
+              if (micFlushTimerRef.current !== null) {
+                window.clearTimeout(micFlushTimerRef.current);
+              }
+              micFlushTimerRef.current = window.setTimeout(() => {
+                try { flushMic(); } catch (_) {}
+              }, 800);
+            } catch (e) {
+              console.warn('feed mic base64 failed', e);
+            }
+          }
+        }
       }
       if ((data as ClientContentMessage)?.clientContent) {
         // 用户输入了就会有一个turnComplete，立即结束
@@ -275,6 +314,7 @@ export function useLiveAPI({
       setConnected(true);
       // 清空之前的转录文本与临时转写消息
       setTranscribedText('');
+      setMicTranscribedText('');
       setCurrentTranscriptMessage(null);
     } catch (err: any) {
       // 将错误抛出给调用方（页面）以便弹窗提示
@@ -287,6 +327,7 @@ export function useLiveAPI({
   const disconnect = useCallback(async () => {
     client.disconnect();
     setConnected(false);
+    setMicTranscribedText('');
   }, [setConnected, client]);
 
   const setOutputModeCallback = useCallback((mode: string) => {
@@ -307,5 +348,6 @@ export function useLiveAPI({
     setOutputMode: setOutputModeCallback,
     transcribedText,
     setSpeechToTextEnabled,
+    micTranscribedText,
   };
 }
