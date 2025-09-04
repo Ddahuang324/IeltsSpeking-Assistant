@@ -81,7 +81,7 @@ export function useLiveAPI({
     enabled: outputMode === 'audio_text' && speechToTextEnabled,
     onResult: (text: string) => {
       console.log('🎯 Vosk 最终结果:', text);
-      setTranscribedText(text); // 直接设置，不累积
+      setTranscribedText(''); // 清空实时缓冲区，避免停留
       // 将最终转写结果作为一条 ServerContentMessage 推入，便于在聊天历史中记录
       setCurrentTranscriptMessage({
         serverContent: {
@@ -120,6 +120,8 @@ export function useLiveAPI({
     onError: (err) => console.error('[Mic->Vosk] error:', err),
   });
   const micFlushTimerRef = useRef<number | null>(null);
+  // 新增：机器人音频的静默定时器，用于触发分段 flush
+  const botFlushTimerRef = useRef<number | null>(null);
   // 服务端返回的语音，一方面直接播放，另一方面需要保存起来，结束的时候，生成一个播放地址
   const botAudioParts = useRef<Part[]>([]);
   const botContentParts = useRef<Part[]>([]);
@@ -163,6 +165,13 @@ export function useLiveAPI({
             console.log('📤 发送音频数据给Vosk，使用24000Hz采样率');
             // Gemini返回的音频采样率是24000Hz，需要传递给Vosk
             processAudioData(data, 24000);
+            // 基于静默的分段：收到音频后重置定时器，静默一段时间后触发 flush()
+            if (botFlushTimerRef.current !== null) {
+              window.clearTimeout(botFlushTimerRef.current);
+            }
+            botFlushTimerRef.current = window.setTimeout(() => {
+              try { flush(); } catch (_) {}
+            }, 900);
           } else {
             console.log('⚠️ Vosk未准备好或已禁用');
           }
@@ -180,8 +189,13 @@ export function useLiveAPI({
         .off("close", onClose)
         .off("interrupted", stopAudioStreamer)
         .off("audio", onAudio);
+      // 清理机器人静默定时器
+      if (botFlushTimerRef.current !== null) {
+        window.clearTimeout(botFlushTimerRef.current);
+        botFlushTimerRef.current = null;
+      }
     };
-  }, [client, outputMode, isReady, processAudioData, speechToTextEnabled]);
+  }, [client, outputMode, isReady, processAudioData, speechToTextEnabled, flush]);
 
   useEffect(() => {
     let currnetBotMessageId: string = nanoid()
