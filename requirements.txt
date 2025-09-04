@@ -1,0 +1,20 @@
+# Python dependencies for Gemini-Next-Web services
+
+# Flask web framework and CORS support
+flask>=2.3.0
+flask-cors>=4.0.0
+
+# Google Gemini AI API
+google-genai>=0.3.0
+
+# Environment variables management
+python-dotenv>=1.0.0
+
+# Vosk speech recognition
+vosk>=0.3.45
+
+# Numerical computing for audio processing
+numpy>=1.24.0
+
+# Standard library modules (included with Python)
+# json, os, time, functools, wave, tempfile, threading
