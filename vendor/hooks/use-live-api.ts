@@ -21,6 +21,7 @@ import {
 } from "../lib/multimodal-live-client";
 import { LiveConfig, LiveOutgoingMessage, ServerContentMessage, RealtimeInputMessage, ClientContentMessage, ModelTurn, ServerContent } from "../multimodal-live-types";
 import { AudioStreamer } from "../lib/audio-streamer";
+import { AudioRecorder } from "../lib/audio-recorder";
 import { audioContext } from "../lib/utils";
 import VolMeterWorket from "../lib/worklets/vol-meter";
 import { GenerativeContentBlob, Part } from "@google/generative-ai";
@@ -44,6 +45,8 @@ export type UseLiveAPIResults = {
   transcribedText: string;
   setSpeechToTextEnabled: (enabled: boolean) => void;
   micTranscribedText: string;
+  audioRecorder: AudioRecorder | null;
+  audioStreamer: AudioStreamer | null;
 };
 
 export function useLiveAPI({
@@ -55,6 +58,7 @@ export function useLiveAPI({
     [url, apiKey],
   );
   const audioStreamerRef = useRef<AudioStreamer | null>(null);
+  const audioRecorderRef = useRef<AudioRecorder | null>(null);
 
   const [connected, setConnected] = useState(false);
   const [config, setConfig] = useState<LiveConfig>({
@@ -143,6 +147,13 @@ export function useLiveAPI({
       });
     }
   }, [audioStreamerRef]);
+
+  // register audio recorder for microphone input
+  useEffect(() => {
+    if (!audioRecorderRef.current) {
+      audioRecorderRef.current = new AudioRecorder(16000);
+    }
+  }, [audioRecorderRef]);
 
   useEffect(() => {
     const onClose = () => {
@@ -363,5 +374,7 @@ export function useLiveAPI({
     transcribedText,
     setSpeechToTextEnabled,
     micTranscribedText,
+    audioRecorder: audioRecorderRef.current,
+    audioStreamer: audioStreamerRef.current,
   };
 }

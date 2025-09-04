@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { UserOutlined, RobotOutlined } from '@ant-design/icons';
-import { PauseCircleOutlined, PoweroffOutlined } from '@ant-design/icons';
+import { PauseCircleOutlined, PoweroffOutlined, AudioOutlined, StopOutlined, DownloadOutlined } from '@ant-design/icons';
 import MediaButtons from '@/components/media-buttons';
 import { useLiveAPIContext } from '@/vendor/contexts/LiveAPIContext';
 import {
@@ -10,6 +10,7 @@ import {
 	ServerContentMessage,
 } from '@/vendor/multimodal-live-types';
 import { base64sToArrayBuffer, pcmBufferToBlob } from '@/vendor/lib/utils';
+import { useConversationRecorder, formatDuration, downloadRecording, cleanupRecordingUrls } from '@/vendor/hooks/use-conversation-recorder';
 
 import {
 	Button,
@@ -199,7 +200,19 @@ const LivePage: React.FC = () => {
 		setOutputMode,
 		transcribedText,
 		setSpeechToTextEnabled,
+		audioRecorder,
+		audioStreamer,
 	} = useLiveAPIContext();
+
+	// 录制功能
+	const {
+		isRecording,
+		duration,
+		startRecording,
+		stopRecording,
+		error: recordingError,
+		recordingUrls,
+	} = useConversationRecorder(audioRecorder, audioStreamer);
 
 	// 监听连接异常断开，弹窗提示
 	useEffect(() => {
@@ -475,7 +488,15 @@ const LivePage: React.FC = () => {
 		border: 'none',
 	};
 
-	const handleDisconnect = () => {
+	const handleDisconnect = async () => {
+		// 如果正在录制，先停止录制
+		if (isRecording) {
+			try {
+				await stopRecording();
+			} catch (err) {
+				console.error('停止录制失败:', err);
+			}
+		}
 		setVideoStream(null);
 		disconnect();
 	};
@@ -493,6 +514,74 @@ const LivePage: React.FC = () => {
 			});
 		}
 	};
+
+	// 录制控制函数
+	const handleStartRecording = async () => {
+		if (!connected) {
+			Modal.warning({
+				title: '无法开始录制',
+				content: '请先连接到 Gemini Live 服务',
+				okText: '好的',
+			});
+			return;
+		}
+		try {
+			await startRecording();
+		} catch (err: any) {
+			Modal.error({
+				title: '开始录制失败',
+				content: err?.message || '无法开始录制',
+				okText: '好的',
+			});
+		}
+	};
+
+	const handleStopRecording = async () => {
+		try {
+			const urls = await stopRecording();
+			if (urls) {
+				Modal.success({
+					title: '录制完成',
+					content: '对话录制已完成，您可以下载录制文件。',
+					okText: '好的',
+				});
+			}
+		} catch (err: any) {
+			Modal.error({
+				title: '停止录制失败',
+				content: err?.message || '无法停止录制',
+				okText: '好的',
+			});
+		}
+	};
+
+	// 下载录制文件
+	const handleDownloadRecording = (type: 'mic' | 'api' | 'mixed') => {
+		if (!recordingUrls) return;
+		
+		const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+		const urls = {
+			mic: recordingUrls.micUrl,
+			api: recordingUrls.apiUrl,
+			mixed: recordingUrls.mixedUrl,
+		};
+		const filenames = {
+			mic: `conversation-mic-${timestamp}.wav`,
+			api: `conversation-api-${timestamp}.wav`,
+			mixed: `conversation-mixed-${timestamp}.wav`,
+		};
+		
+		downloadRecording(urls[type], filenames[type]);
+	};
+
+	// 清理录制文件URLs
+	useEffect(() => {
+		return () => {
+			if (recordingUrls) {
+				cleanupRecordingUrls(recordingUrls);
+			}
+		};
+	}, [recordingUrls]);
 
 	return (
 		<Layout
@@ -599,7 +688,7 @@ const LivePage: React.FC = () => {
 								)}
 							</Flex>
 							</div>
-							<Flex justify='center'>
+							<Flex justify='center' gap='middle' vertical>
 								<Button
 									color='primary'
 									variant={connected ? 'outlined' : 'solid'}
@@ -616,6 +705,62 @@ const LivePage: React.FC = () => {
 										? 'Disconnect'
 										: 'Click me to start !'}
 								</Button>
+								
+								{/* 录制控制区域 */}
+								{connected && (
+									<Flex justify='center' gap='small' align='center' wrap>
+										<Button
+											type={isRecording ? 'primary' : 'default'}
+											danger={isRecording}
+											onClick={isRecording ? handleStopRecording : handleStartRecording}
+											icon={isRecording ? <StopOutlined /> : <AudioOutlined />}
+											size='small'
+										>
+											{isRecording ? '停止录制' : '开始录制'}
+										</Button>
+										
+										{isRecording && (
+											<Tag color='red'>
+												录制中 {formatDuration(duration)}
+											</Tag>
+										)}
+										
+										{recordingUrls && (
+											<Flex gap='small'>
+												<Button
+													size='small'
+													icon={<DownloadOutlined />}
+													onClick={() => handleDownloadRecording('mixed')}
+													title='下载混合音频'
+												>
+													混合
+												</Button>
+												<Button
+													size='small'
+													icon={<DownloadOutlined />}
+													onClick={() => handleDownloadRecording('mic')}
+													title='下载麦克风音频'
+												>
+													麦克风
+												</Button>
+												<Button
+													size='small'
+													icon={<DownloadOutlined />}
+													onClick={() => handleDownloadRecording('api')}
+													title='下载API音频'
+												>
+													API
+												</Button>
+											</Flex>
+										)}
+										
+										{recordingError && (
+											<Tag color='red' style={{ fontSize: '12px' }}>
+												错误: {recordingError}
+											</Tag>
+										)}
+									</Flex>
+								)}
 							</Flex>
 							<div
 								className='px-5 py-2'

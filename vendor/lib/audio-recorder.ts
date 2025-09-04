@@ -38,6 +38,9 @@ export class AudioRecorder extends EventEmitter {
   recording: boolean = false;
   recordingWorklet: AudioWorkletNode | undefined;
   vuWorklet: AudioWorkletNode | undefined;
+  
+  // 录制相关回调
+  private recordingCallback: ((audioData: Float32Array, sampleRate: number) => void) | null = null;
 
   private starting: Promise<void> | null = null;
 
@@ -67,10 +70,16 @@ export class AudioRecorder extends EventEmitter {
       this.recordingWorklet.port.onmessage = async (ev: MessageEvent) => {
         // worklet processes recording floats and messages converted buffer
         const arrayBuffer = ev.data.data.int16arrayBuffer;
+        const floatData = ev.data.data.float32Array;
 
         if (arrayBuffer) {
           const arrayBufferString = arrayBufferToBase64(arrayBuffer);
           this.emit("data", arrayBufferString);
+        }
+        
+        // 如果有录制回调且有float32数据，发送给录制器
+        if (this.recordingCallback && floatData) {
+          this.recordingCallback(floatData, this.sampleRate);
         }
       };
       this.source.connect(this.recordingWorklet);
@@ -107,5 +116,20 @@ export class AudioRecorder extends EventEmitter {
       return;
     }
     handleStop();
+  }
+  
+  /**
+   * 设置录制回调函数
+   * @param callback 录制回调函数，接收音频数据和采样率
+   */
+  setRecordingCallback(callback: ((audioData: Float32Array, sampleRate: number) => void) | null): void {
+    this.recordingCallback = callback;
+  }
+  
+  /**
+   * 获取当前采样率
+   */
+  getSampleRate(): number {
+    return this.sampleRate;
   }
 }

@@ -32,6 +32,9 @@ export class AudioStreamer {
   private checkInterval: number | null = null;
   private initialBufferTime: number = 0.1; //0.1 // 100ms initial buffer
   private endOfQueueAudioSource: AudioBufferSourceNode | null = null;
+  
+  // 录制相关回调
+  private recordingCallback: ((audioData: Float32Array, sampleRate: number) => void) | null = null;
 
   public onComplete = () => {};
 
@@ -88,6 +91,11 @@ export class AudioStreamer {
         //   `dataView.length: ${dataView.byteLength},  i * 2: ${i * 2}`,
         // );
       }
+    }
+    
+    // 如果有录制回调，发送音频数据给录制器
+    if (this.recordingCallback) {
+      this.recordingCallback(float32Array, this.sampleRate);
     }
 
     const newBuffer = new Float32Array(
@@ -252,6 +260,21 @@ export class AudioStreamer {
     } else {
       this.onComplete();
     }
+  }
+  
+  /**
+   * 设置录制回调函数
+   * @param callback 录制回调函数，接收音频数据和采样率
+   */
+  setRecordingCallback(callback: ((audioData: Float32Array, sampleRate: number) => void) | null): void {
+    this.recordingCallback = callback;
+  }
+  
+  /**
+   * 获取当前采样率
+   */
+  getSampleRate(): number {
+    return this.sampleRate;
   }
 }
 

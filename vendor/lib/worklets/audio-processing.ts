@@ -20,6 +20,7 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
   // send and clear buffer every 2048 samples, 
   // which at 16khz is about 8 times a second
   buffer = new Int16Array(2048);
+  floatBuffer = new Float32Array(2048);
 
   // current write index
   bufferWriteIndex = 0;
@@ -46,6 +47,7 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
       event: "chunk",
       data: {
         int16arrayBuffer: this.buffer.slice(0, this.bufferWriteIndex).buffer,
+        float32Array: this.floatBuffer.slice(0, this.bufferWriteIndex),
       },
     });
     this.bufferWriteIndex = 0;
@@ -57,7 +59,10 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
     for (let i = 0; i < l; i++) {
       // convert float32 -1 to 1 to int16 -32768 to 32767
       const int16Value = float32Array[i] * 32768;
-      this.buffer[this.bufferWriteIndex++] = int16Value;
+      this.buffer[this.bufferWriteIndex] = int16Value;
+      // 同时保存原始的float32数据
+      this.floatBuffer[this.bufferWriteIndex] = float32Array[i];
+      this.bufferWriteIndex++;
       if(this.bufferWriteIndex >= this.buffer.length) {
         this.sendAndClearBuffer();
       }
