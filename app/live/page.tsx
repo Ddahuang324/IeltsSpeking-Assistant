@@ -197,6 +197,7 @@ const LivePage: React.FC = () => {
 		disconnect,
 		currentBotMessage,
 		currentUserMessage,
+		currentTranscriptMessage,
 		setOutputMode,
 		transcribedText,
 		setSpeechToTextEnabled,
@@ -296,6 +297,27 @@ const LivePage: React.FC = () => {
 			});
 		}
 	}, [currentBotMessage]);
+
+	// 在 Audio+Text 下，将最终转写结果作为一条对话消息加入历史
+	useEffect(() => {
+		console.log('currentTranscriptMessage', currentTranscriptMessage);
+		if (currentTranscriptMessage) {
+			setMessages((messages) => {
+				if (
+					messages.filter((m) => m?.id === currentTranscriptMessage?.id)
+						.length > 0
+				) {
+					return messages.map((m) =>
+						m?.id === currentTranscriptMessage?.id
+							? currentTranscriptMessage
+							: m
+					);
+				} else {
+					return [...messages, currentTranscriptMessage];
+				}
+			});
+		}
+	}, [currentTranscriptMessage]);
 
 	useEffect(() => {
 		console.log('currentUserMessage', currentUserMessage);

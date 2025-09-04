@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { nanoid } from 'nanoid'
+import { nanoid } from 'nanoid';
 
 export interface UseVoskRecognitionOptions {
   enabled: boolean;

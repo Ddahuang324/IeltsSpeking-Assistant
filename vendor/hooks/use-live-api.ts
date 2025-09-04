@@ -38,6 +38,7 @@ export type UseLiveAPIResults = {
   volume: number;
   currentUserMessage: RealtimeInputMessage | ClientContentMessage | null;
   currentBotMessage: ServerContentMessage | null;
+  currentTranscriptMessage: ServerContentMessage | null;
   setOutputMode: (mode: string) => void;
   transcribedText: string;
   setSpeechToTextEnabled: (enabled: boolean) => void;
@@ -63,6 +64,7 @@ export function useLiveAPI({
   // current message
   const [currentUserMessage, setCurrentUserMessage] = useState<RealtimeInputMessage | ClientContentMessage | null>(null);
   const [currentBotMessage, setCurrentBotMessage] = useState<ServerContentMessage | null>(null);
+  const [currentTranscriptMessage, setCurrentTranscriptMessage] = useState<ServerContentMessage | null>(null);
   // 转写文本状态
   const [transcribedText, setTranscribedText] = useState<string>('');
   // Vosk语音识别
@@ -77,6 +79,15 @@ export function useLiveAPI({
     onResult: (text: string) => {
       console.log('🎯 Vosk 最终结果:', text);
       setTranscribedText(text); // 直接设置，不累积
+      // 将最终转写结果作为一条 ServerContentMessage 推入，便于在聊天历史中记录
+      setCurrentTranscriptMessage({
+        serverContent: {
+          modelTurn: {
+            parts: [{ text }],
+          },
+        },
+        id: nanoid(),
+      });
     },
     onPartialResult: (text: string) => {
       console.log('🎤 Vosk 部分结果:', text);
@@ -262,8 +273,9 @@ export function useLiveAPI({
     try {
       await client.connect(config);
       setConnected(true);
-      // 清空之前的转录文本
+      // 清空之前的转录文本与临时转写消息
       setTranscribedText('');
+      setCurrentTranscriptMessage(null);
     } catch (err: any) {
       // 将错误抛出给调用方（页面）以便弹窗提示
       console.error('connect failed:', err);
@@ -291,6 +303,7 @@ export function useLiveAPI({
     volume,
     currentUserMessage,
     currentBotMessage,
+    currentTranscriptMessage,
     setOutputMode: setOutputModeCallback,
     transcribedText,
     setSpeechToTextEnabled,
