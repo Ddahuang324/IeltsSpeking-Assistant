@@ -1,0 +1,61 @@
+{
+	"name": "gemini-next-web",
+	"version": "0.1.0",
+	"private": true,
+	"author": {
+		"name": "dogtiti",
+		"email": "dogtiti921@gmail.com",
+		"url": "https://github.com/dogtiti"
+	},
+	"license": "MIT",
+	"homepage": "https://github.com/ElricLiu/GeminiNextWeb#readme",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/ElricLiu/GeminiNextWeb.git"
+	},
+	"bugs": {
+		"url": "https://github.com/ElricLiu/GeminiNextWeb/issues"
+	},
+	"keywords": [
+		"gemini",
+		"chatbot",
+		"next.js",
+		"react",
+		"typescript"
+	],
+	"scripts": {
+		"dev": "next dev",
+		"build": "next build",
+		"start": "next start",
+		"lint": "next lint"
+	},
+	"dependencies": {
+		"@ant-design/icons": "^5.5.2",
+		"@ant-design/nextjs-registry": "^1.0.2",
+		"@ant-design/x": "^1.0.2",
+		"@antv/gpt-vis": "^0.3.4",
+		"@google/generative-ai": "^0.21.0",
+		"@types/lodash": "^4.17.13",
+		"ahooks": "^3.8.4",
+		"antd": "^5.22.5",
+		"clsx": "^2.1.1",
+		"eventemitter3": "^5.0.1",
+		"lodash-es": "^4.17.21",
+		"nanoid": "^5.0.9",
+		"next": "14.2.20",
+		"react": "^18",
+		"react-dom": "^18",
+		"vosk-browser": "^0.0.8"
+	},
+	"devDependencies": {
+		"@types/lodash-es": "^4.17.12",
+		"@types/node": "^20",
+		"@types/react": "^18",
+		"@types/react-dom": "^18",
+		"eslint": "^8",
+		"eslint-config-next": "14.2.20",
+		"postcss": "^8",
+		"tailwindcss": "^3.4.1",
+		"typescript": "^5"
+	}
+}
