@@ -262,8 +262,8 @@ const LivePage: React.FC = () => {
 	});
 
 	// Vosk服务状态管理
-	const [voskServiceStatus, setVoskServiceStatus] = useState<'running' | 'stopped' | 'checking'>('checking');
-	const [voskServiceProcess, setVoskServiceProcess] = useState<string | null>(null);
+	const [, setVoskServiceStatus] = useState<'running' | 'stopped' | 'checking'>('checking');
+	
 
 	// 检查Vosk服务状态
 	const checkVoskServiceStatus = async () => {
@@ -275,85 +275,12 @@ const LivePage: React.FC = () => {
 			} else {
 				setVoskServiceStatus('stopped');
 			}
-		} catch (error) {
+		} catch {
 			setVoskServiceStatus('stopped');
 		}
 	};
 
-	// 启动Vosk服务
-	const startVoskService = async () => {
-		try {
-			setVoskServiceStatus('checking');
-			
-			// 创建一个新的终端来运行Python服务
-			const response = await fetch('/api/vosk/start', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-			});
-			
-			if (response.ok) {
-				const data = await response.json();
-				setVoskServiceProcess(data.processId);
-				// 等待一下再检查状态
-				setTimeout(() => {
-					checkVoskServiceStatus();
-				}, 2000);
-				Modal.success({
-					title: '启动成功',
-					content: 'Vosk服务正在启动中...',
-					okText: '好的',
-				});
-			} else {
-				throw new Error('启动失败');
-			}
-		} catch (error) {
-			console.error('启动Vosk服务失败:', error);
-			setVoskServiceStatus('stopped');
-			Modal.error({
-				title: '启动失败',
-				content: '请确保Python环境已安装并且vosk_service.py文件存在',
-				okText: '好的',
-			});
-		}
-	};
 
-	// 停止Vosk服务
-	const stopVoskService = async () => {
-		try {
-			setVoskServiceStatus('checking');
-			
-			const response = await fetch('/api/vosk/stop', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({ processId: voskServiceProcess }),
-			});
-			
-			if (response.ok) {
-				setVoskServiceProcess(null);
-				setVoskServiceStatus('stopped');
-				Modal.success({
-					title: '停止成功',
-					content: 'Vosk服务已停止',
-					okText: '好的',
-				});
-			} else {
-				throw new Error('停止失败');
-			}
-		} catch (error) {
-			console.error('停止Vosk服务失败:', error);
-			Modal.error({
-				title: '停止失败',
-				content: '无法停止Vosk服务，请手动终止进程',
-				okText: '好的',
-			});
-			// 重新检查状态
-			checkVoskServiceStatus();
-		}
-	};
 
 	// 定期检查Vosk服务状态
 	useEffect(() => {

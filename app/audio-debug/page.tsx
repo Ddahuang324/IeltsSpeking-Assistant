@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
-import { Button, Card, Typography, Space, Alert, Divider } from 'antd';
+import { Button, Card, Typography, Space, Alert } from 'antd';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 interface AudioDebugInfo {
   originalSize: number;

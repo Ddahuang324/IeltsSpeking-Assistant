@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
@@ -9,10 +9,7 @@ let voskProcess: any = null;
 // 进程ID文件路径
 const PID_FILE = path.join(process.cwd(), '.vosk_pid');
 
-// 设置进程引用的函数
-export function setVoskProcess(process: any) {
-  voskProcess = process;
-}
+
 
 // 保存进程ID到文件
 function savePidToFile(pid: number) {
@@ -29,7 +26,7 @@ function isProcessRunning(pid: number): boolean {
   try {
     process.kill(pid, 0); // 发送信号0检查进程是否存在
     return true;
-  } catch (error) {
+  } catch {
     return false;
   }
 }
@@ -62,7 +59,7 @@ function cleanupStoppedProcess() {
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     // 清理已停止的进程
     cleanupStoppedProcess();
@@ -166,4 +163,3 @@ export async function POST(request: NextRequest) {
 }
 
 // 导出进程引用供其他模块使用
-export { voskProcess };

@@ -12,7 +12,6 @@ import {
 	Tag,
 	Typography,
 	Space,
-	Progress,
 	Modal,
 	Row,
 	Col,
@@ -20,7 +19,6 @@ import {
 	Collapse,
 	List,
 	Badge,
-	Divider,
 	Tooltip,
 } from 'antd';
 import {
@@ -40,7 +38,7 @@ import {
 
 const { Header, Content } = Layout;
 const { TextArea } = Input;
-const { Text, Title } = Typography;
+const { Text } = Typography;
 const { Panel } = Collapse;
 
 // 雅思口语分析结果接口
@@ -122,7 +120,7 @@ const IELTSPage: React.FC = () => {
 	const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
 	const [result, setResult] = useState<IELTSAnalysisResult | null>(null);
 	const [error, setError] = useState<string>('');
-	const [history, setHistory] = useState<Array<{ text: string; result: IELTSAnalysisResult }>>([]);
+	const [, setHistory] = useState<Array<{ text: string; result: IELTSAnalysisResult }>>([]);
 
 	// 雅思口语分析API调用
 	const analyzeIELTSText = async (text: string): Promise<IELTSAnalysisResult> => {
@@ -201,10 +199,7 @@ const IELTSPage: React.FC = () => {
 		return result.ielts_band_score.overall.score;
 	};
 
-	// 将IELTS评分转换为百分制显示
-	const convertToPercentage = (score: number) => {
-		return Math.round((score / 9) * 100);
-	};
+
 
 	return (
 		<Layout style={{ height: '100vh' }}>
@@ -459,7 +454,7 @@ const IELTSPage: React.FC = () => {
 														<Flex justify="space-between" align="center">
 															<Space>
 																<Badge color={getErrorSeverityColor(error.type)} />
-																<Text strong>"{error.text}"</Text>
+																<Text strong>&quot;{error.text}&quot;</Text>
 																<Tag color={getErrorSeverityColor(error.type)}>{error.type}</Tag>
 															</Space>
 														</Flex>
@@ -498,7 +493,7 @@ const IELTSPage: React.FC = () => {
 												<List.Item>
 													<Space direction="vertical" style={{ width: '100%' }}>
 														<Flex justify="space-between" align="center">
-															<Text strong>"{issue.text}"</Text>
+															<Text strong>&quot;{issue.text}&quot;</Text>
 															<Tag color="orange">{issue.type}</Tag>
 														</Flex>
 														<Text type="secondary">{issue.suggestion}</Text>
@@ -525,7 +520,7 @@ const IELTSPage: React.FC = () => {
 											renderItem={(issue) => (
 												<List.Item>
 													<Space direction="vertical" style={{ width: '100%' }}>
-														<Text strong>"{issue.sentence}"</Text>
+														<Text strong>&quot;{issue.sentence}&quot;</Text>
 														<Text type="secondary">{issue.issue}</Text>
 													</Space>
 												</List.Item>
@@ -577,7 +572,7 @@ const IELTSPage: React.FC = () => {
 													renderItem={(suggestion) => (
 														<List.Item>
 															<Space direction="vertical" style={{ width: '100%' }}>
-																<Text strong>替换 "{suggestion.basic_word}":</Text>
+																<Text strong>替换 &quot;{suggestion.basic_word}&quot;:</Text>
 																<Space wrap>
 																	{suggestion.alternatives.map((alt, index) => (
 																		<Tag key={index} color="blue">{alt}</Tag>

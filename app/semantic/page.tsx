@@ -372,7 +372,7 @@ const SemanticPage: React.FC = () => {
 								<Flex justify="center" align="center" style={{ height: 200 }}>
 									<Space direction="vertical" align="center">
 										<BulbOutlined style={{ fontSize: 48, color: '#d9d9d9' }} />
-										<Text type="secondary">请输入文本并点击"开始分析"</Text>
+										<Text type="secondary">请输入文本并点击&quot;开始分析&quot;</Text>
 									</Space>
 								</Flex>
 							</Card>

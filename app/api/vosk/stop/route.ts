@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { voskProcess, setVoskProcess } from '../start/route';
 import fs from 'fs';
 import path from 'path';
+import { execSync } from 'child_process';
 
 // 进程ID文件路径
 const PID_FILE = path.join(process.cwd(), '.vosk_pid');
@@ -11,7 +11,7 @@ function isProcessRunning(pid: number): boolean {
   try {
     process.kill(pid, 0); // 发送信号0检查进程是否存在
     return true;
-  } catch (error) {
+  } catch {
     return false;
   }
 }
@@ -30,7 +30,7 @@ function forceKillProcess(pid: number): boolean {
           console.error(`进程 ${pid} 仍在运行，尝试系统级终止`);
           // 尝试使用系统命令终止
           try {
-            require('child_process').execSync(`kill -9 ${pid}`, { stdio: 'ignore' });
+            execSync(`kill -9 ${pid}`, { stdio: 'ignore' });
           } catch (e) {
             console.error(`系统级终止进程 ${pid} 失败:`, e);
           }
@@ -66,11 +66,11 @@ export async function POST(request: NextRequest) {
     let processKilled = false;
     let targetPid: number | null = null;
 
-    // 1. 尝试通过模块变量停止进程
-    if (voskProcess && voskProcess.pid) {
-      targetPid = voskProcess.pid;
+    // 1. 尝试通过传入的processId停止进程
+    if (processId) {
+      targetPid = processId;
       try {
-        console.log(`尝试停止分离的模块进程 ${targetPid}`);
+        console.log(`尝试停止指定进程 ${targetPid}`);
         
         // 对于分离的进程，直接使用强力终止
          if (targetPid && isProcessRunning(targetPid)) {
@@ -149,7 +149,6 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. 清理资源
-    setVoskProcess(null); // 清理模块变量
     cleanupPidFile(); // 清理PID文件
 
     if (processKilled) {
