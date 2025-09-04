@@ -72,9 +72,8 @@ export function useLiveAPI({
     enabled: outputMode === 'audio_text' && speechToTextEnabled 
   });
   
-  const { processAudioData, isReady, error } = useVoskRecognition({
+  const { processAudioData, flush, isReady, error } = useVoskRecognition({
     enabled: outputMode === 'audio_text' && speechToTextEnabled,
-    modelUrl: '/models/vosk-model-small-en-us-0.15.tar.gz',
     onResult: (text: string) => {
       console.log('🎯 Vosk 最终结果:', text);
       setTranscribedText(text); // 直接设置，不累积
@@ -229,6 +228,14 @@ export function useLiveAPI({
         botContentParts.current = []; // 清空数据
         botAudioParts.current = [];
 			}
+      // 当本轮对话的音频输出结束时，触发一次Vosk flush，获取最终转写结果
+      if (speechToTextEnabled && isReady) {
+        try {
+          flush();
+        } catch (e) {
+          console.warn('flush 调用失败', e);
+        }
+      }
 		}
     client
       .on('interrupted', onInterrupted)
@@ -244,7 +251,7 @@ export function useLiveAPI({
         .off('input', onInput)
         .off('audiocontent', onAudioContent);
     }
-  }, [client])
+  }, [client, flush, isReady, speechToTextEnabled])
 
   const connect = useCallback(async () => {
     console.log(config);
