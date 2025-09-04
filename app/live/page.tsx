@@ -27,6 +27,7 @@ import {
 import { Sender, Bubble } from '@ant-design/x';
 import { useLocalStorageState } from 'ahooks';
 import FieldItem from '@/components/field-item';
+import ChatExport from '@/components/chat-export';
 import GeminiIcon from '@/app/icon/google-gemini-icon.svg';
 import Image from 'next/image';
 import { GPTVis } from '@antv/gpt-vis';
@@ -534,29 +535,21 @@ const LivePage: React.FC = () => {
 								overflow: 'hidden',
 							}}
 						>
-							<div className='px-5 py-2'>
-								<Collapse
-									bordered={false}
-									style={{ background: colorBgContainer }}
-									items={[
-										{
-											key: 'prompts',
-											label: 'System Instructions',
-											children: (
-												<Input
-													onChange={(e) =>
-														setPrompt(
-															e.target.value
-														)
-													}
-													value={prompt}
-													placeholder='Optional tone and style instructions for the model'
-												/>
-											),
-											style: panelStyle,
-										},
-									]}
-								/>
+
+							{/* 消息工具栏 */}
+							<div
+								style={{
+									padding: '8px 24px',
+									borderBottom: '1px solid #f0f0f0',
+									background: '#fafafa',
+								}}
+							>
+								<Flex justify='space-between' align='center'>
+									<span style={{ fontSize: '14px', color: '#666' }}>
+										对话历史 ({messages.filter(m => m !== null).length} 条消息)
+									</span>
+									<ChatExport messages={messages} disabled={!connected} />
+								</Flex>
 							</div>
 							<div
 								className='messages'
@@ -683,10 +676,32 @@ const LivePage: React.FC = () => {
 					>
 						Run settings
 					</div>
-					<FieldItem
-						label='Model'
-						icon={<Image src={GeminiIcon} alt={'Model'} />}
-					>
+						<Collapse
+							bordered={false}
+							style={{ background: colorBgContainer }}
+							items={[
+								{
+									key: 'prompts',
+									label: 'System Instructions',
+									children: (
+										<Input
+											onChange={(e) =>
+												setPrompt(
+													e.target.value
+												)
+											}
+											value={prompt}
+											placeholder='Optional tone and style instructions for the model'
+										/>
+									),
+									style: panelStyle,
+								},
+							]}
+						/>
+						<FieldItem
+							label='Model'
+							icon={<Image src={GeminiIcon} alt={'Model'} />}
+						>
 						<Select
 							popupMatchSelectWidth={false}
 							onChange={setModel}
@@ -820,56 +835,10 @@ const LivePage: React.FC = () => {
 								style: panelStyle,
 							},
 						]}
-					/>
-				{/* Vosk服务状态控制 - 独立于Tools区域 */}
-				<div
-					style={{
-						marginTop: 16,
-						padding: '12px 16px',
-						border: '1px solid #d9d9d9',
-						borderRadius: 6,
-						background: colorBgContainer,
-					}}
-				>
-					<div
-						style={{
-							fontSize: 14,
-							fontWeight: 500,
-							marginBottom: 8,
-						}}
-					>
-						Vosk服务状态
-					</div>
-					<Flex gap={8} align="center">
-						<Tag 
-							color={
-								voskServiceStatus === 'running' ? 'green' : 
-								voskServiceStatus === 'stopped' ? 'red' : 'orange'
-							}
-						>
-							{voskServiceStatus === 'running' ? '运行中' : 
-							 voskServiceStatus === 'stopped' ? '已停止' : '检查中'}
-						</Tag>
-						<Button 
-							size="small"
-							type={voskServiceStatus === 'running' ? 'default' : 'primary'}
-							icon={voskServiceStatus === 'running' ? <PauseCircleOutlined /> : <PoweroffOutlined />}
-							onClick={voskServiceStatus === 'running' ? stopVoskService : startVoskService}
-							loading={voskServiceStatus === 'checking'}
-						>
-							{voskServiceStatus === 'running' ? '停止' : '启动'}
-						</Button>
-						<Button 
-							size="small"
-							onClick={checkVoskServiceStatus}
-							loading={voskServiceStatus === 'checking'}
-						>
-							刷新
-						</Button>
-					</Flex>
-				</div>
+				/>
 			</Flex>
 		</Flex>
+
 	</Layout>
 );
 };

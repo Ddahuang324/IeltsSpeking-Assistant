@@ -1,8 +1,8 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { AudioOutlined, LeftOutlined, GithubOutlined } from '@ant-design/icons';
+import { AudioOutlined, LeftOutlined, GithubOutlined, PlayCircleOutlined, StopOutlined, LoadingOutlined } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
-import { Layout, Menu, theme, ConfigProvider, Flex, App } from 'antd';
+import { Layout, Menu, theme, ConfigProvider, Flex, App, Button, message } from 'antd';
 import clsx from 'clsx';
 import { useRouter, usePathname } from 'next/navigation';
 import LiveAPIProvider from '@/components/live-api-provider';
@@ -39,12 +39,92 @@ const GlobalLayout: React.FC<{
 		token: { colorBgLayout },
 	} = theme.useToken();
 	const [mounted, setMounted] = useState(false);
+	const [voskStatus, setVoskStatus] = useState<'stopped' | 'starting' | 'running' | 'error'>('stopped');
+	const [voskProcess, setVoskProcess] = useState<string | null>(null);
 	const router = useRouter();
 	const pathname = usePathname();
 
 	useEffect(() => {
 		setMounted(true);
+		// 检查Vosk服务状态
+		checkVoskStatus();
 	}, []);
+
+	// 检查Vosk服务状态
+	const checkVoskStatus = async () => {
+		try {
+			const response = await fetch('http://localhost:5001/health');
+			if (response.ok) {
+				setVoskStatus('running');
+			} else {
+				setVoskStatus('stopped');
+			}
+		} catch (error) {
+			setVoskStatus('stopped');
+		}
+	};
+
+	// 启动Vosk服务
+	const startVoskService = async () => {
+		setVoskStatus('starting');
+		try {
+			const response = await fetch('/api/vosk/start', {
+				method: 'POST',
+			});
+			const data = await response.json();
+			if (data.success) {
+				setVoskProcess(data.processId?.toString() || 'unknown');
+				message.success('Vosk服务启动成功');
+				// 等待服务启动后检查状态
+				setTimeout(() => {
+					checkVoskStatus();
+				}, 3000);
+			} else {
+				setVoskStatus('error');
+				message.error('启动Vosk服务失败: ' + (data.error || data.details || '未知错误'));
+			}
+		} catch (error) {
+			setVoskStatus('error');
+			message.error('启动Vosk服务失败');
+		}
+	};
+
+	// 停止Vosk服务
+	const stopVoskService = async () => {
+		try {
+			const response = await fetch('/api/vosk/stop', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ processId: voskProcess }),
+			});
+			const data = await response.json();
+			if (data.success) {
+				setVoskProcess(null);
+				setVoskStatus('stopped');
+				message.success('Vosk服务已停止');
+			} else {
+				message.error('停止Vosk服务失败: ' + (data.error || data.details || '未知错误'));
+			}
+		} catch (error) {
+			message.error('停止Vosk服务失败');
+		}
+	};
+
+	// 获取状态显示信息
+	const getStatusInfo = () => {
+		switch (voskStatus) {
+			case 'running':
+				return { text: '● 运行中', color: '#52c41a' };
+			case 'starting':
+				return { text: '● 启动中...', color: '#1890ff' };
+			case 'error':
+				return { text: '● 错误', color: '#ff4d4f' };
+			default:
+				return { text: '● 已停止', color: '#ff4d4f' };
+		}
+	};
 
 	if (!mounted) {
 		return null;
@@ -154,6 +234,56 @@ const GlobalLayout: React.FC<{
 							}}
 						/>
 						<div>
+							{/* Vosk服务状态 */}
+							<div
+								style={{
+									padding: '8px 16px',
+									margin: '8px 0',
+									background: colorBgLayout,
+									borderRadius: '6px',
+									fontSize: '12px',
+									color: '#666',
+									display: collapsed ? 'none' : 'block',
+								}}
+							>
+								<div style={{ marginBottom: '8px', fontWeight: 500 }}>Vosk服务状态</div>
+								<div style={{ color: getStatusInfo().color, marginBottom: '8px' }}>
+									{voskStatus === 'starting' && <LoadingOutlined style={{ marginRight: '4px' }} />}
+									{getStatusInfo().text}
+								</div>
+								<div style={{ display: 'flex', gap: '4px' }}>
+									{voskStatus === 'running' ? (
+										<Button
+											size="small"
+											type="default"
+											icon={<StopOutlined />}
+											onClick={stopVoskService}
+											style={{ fontSize: '11px', height: '24px' }}
+										>
+											停止
+										</Button>
+									) : (
+										<Button
+											size="small"
+											type="primary"
+											icon={<PlayCircleOutlined />}
+											onClick={startVoskService}
+											loading={voskStatus === 'starting'}
+											style={{ fontSize: '11px', height: '24px' }}
+										>
+											启动
+										</Button>
+									)}
+									<Button
+										size="small"
+										type="text"
+										onClick={checkVoskStatus}
+										style={{ fontSize: '11px', height: '24px', padding: '0 4px' }}
+									>
+										刷新
+									</Button>
+								</div>
+							</div>
 							<Menu
 								mode='inline'
 								items={subItems}
