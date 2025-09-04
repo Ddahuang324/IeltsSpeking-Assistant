@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { AudioOutlined, LeftOutlined, GithubOutlined, PlayCircleOutlined, StopOutlined, LoadingOutlined, BulbOutlined, EditOutlined } from '@ant-design/icons';
+import { AudioOutlined, LeftOutlined, GithubOutlined, PlayCircleOutlined, StopOutlined, LoadingOutlined, EditOutlined } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { Layout, Menu, theme, ConfigProvider, Flex, App, Button, message } from 'antd';
 import clsx from 'clsx';
@@ -27,7 +27,6 @@ function getItem(
 
 const items: MenuItem[] = [
 	getItem('Stream Realtime', '/live', <AudioOutlined />),
-	getItem('语义分析', '/semantic', <BulbOutlined />),
 	getItem('雅思口语分析', '/ielts', <EditOutlined />),
 ];
 
@@ -43,6 +42,8 @@ const GlobalLayout: React.FC<{
 	const [mounted, setMounted] = useState(false);
 	const [voskStatus, setVoskStatus] = useState<'stopped' | 'starting' | 'running' | 'error'>('stopped');
 	const [voskProcess, setVoskProcess] = useState<string | null>(null);
+	const [englishAnalysisStatus, setEnglishAnalysisStatus] = useState<'stopped' | 'starting' | 'running' | 'error'>('stopped');
+	const [englishAnalysisProcess, setEnglishAnalysisProcess] = useState<string | null>(null);
 	const router = useRouter();
 	const pathname = usePathname();
 
@@ -50,6 +51,8 @@ const GlobalLayout: React.FC<{
 		setMounted(true);
 		// 检查Vosk服务状态
 		checkVoskStatus();
+		// 检查English Analysis服务状态
+		checkEnglishAnalysisStatus();
 	}, []);
 
 	// 检查Vosk服务状态
@@ -114,9 +117,85 @@ const GlobalLayout: React.FC<{
 		}
 	};
 
-	// 获取状态显示信息
-	const getStatusInfo = () => {
+	// 检查English Analysis服务状态
+	const checkEnglishAnalysisStatus = async () => {
+		try {
+			const response = await fetch('http://localhost:5002/health');
+			if (response.ok) {
+				setEnglishAnalysisStatus('running');
+			} else {
+				setEnglishAnalysisStatus('stopped');
+			}
+		} catch {
+			setEnglishAnalysisStatus('stopped');
+		}
+	};
+
+	// 启动English Analysis服务
+	const startEnglishAnalysisService = async () => {
+		setEnglishAnalysisStatus('starting');
+		try {
+			const response = await fetch('/api/english-analysis/start', {
+				method: 'POST',
+			});
+			const data = await response.json();
+			if (data.success) {
+				setEnglishAnalysisProcess(data.processId?.toString() || 'unknown');
+				message.success('English Analysis服务启动成功');
+				// 等待服务启动后检查状态
+				setTimeout(() => {
+					checkEnglishAnalysisStatus();
+				}, 3000);
+			} else {
+				setEnglishAnalysisStatus('error');
+				message.error('启动English Analysis服务失败: ' + (data.error || data.details || '未知错误'));
+			}
+		} catch {
+			setEnglishAnalysisStatus('error');
+			message.error('启动English Analysis服务失败');
+		}
+	};
+
+	// 停止English Analysis服务
+	const stopEnglishAnalysisService = async () => {
+		try {
+			const response = await fetch('/api/english-analysis/stop', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ processId: englishAnalysisProcess }),
+			});
+			const data = await response.json();
+			if (data.success) {
+				setEnglishAnalysisProcess(null);
+				setEnglishAnalysisStatus('stopped');
+				message.success('English Analysis服务已停止');
+			} else {
+				message.error('停止English Analysis服务失败: ' + (data.error || data.details || '未知错误'));
+			}
+		} catch {
+			message.error('停止English Analysis服务失败');
+		}
+	};
+
+	// 获取Vosk状态显示信息
+	const getVoskStatusInfo = () => {
 		switch (voskStatus) {
+			case 'running':
+				return { text: '● 运行中', color: '#52c41a' };
+			case 'starting':
+				return { text: '● 启动中...', color: '#1890ff' };
+			case 'error':
+				return { text: '● 错误', color: '#ff4d4f' };
+			default:
+				return { text: '● 已停止', color: '#ff4d4f' };
+		}
+	};
+
+	// 获取English Analysis状态显示信息
+	const getEnglishAnalysisStatusInfo = () => {
+		switch (englishAnalysisStatus) {
 			case 'running':
 				return { text: '● 运行中', color: '#52c41a' };
 			case 'starting':
@@ -249,9 +328,9 @@ const GlobalLayout: React.FC<{
 								}}
 							>
 								<div style={{ marginBottom: '8px', fontWeight: 500 }}>Vosk服务状态</div>
-								<div style={{ color: getStatusInfo().color, marginBottom: '8px' }}>
+								<div style={{ color: getVoskStatusInfo().color, marginBottom: '8px' }}>
 									{voskStatus === 'starting' && <LoadingOutlined style={{ marginRight: '4px' }} />}
-									{getStatusInfo().text}
+									{getVoskStatusInfo().text}
 								</div>
 								<div style={{ display: 'flex', gap: '4px' }}>
 									{voskStatus === 'running' ? (
@@ -280,6 +359,56 @@ const GlobalLayout: React.FC<{
 										size="small"
 										type="text"
 										onClick={checkVoskStatus}
+										style={{ fontSize: '11px', height: '24px', padding: '0 4px' }}
+									>
+										刷新
+									</Button>
+								</div>
+							</div>
+							{/* English Analysis服务状态 */}
+							<div
+								style={{
+									padding: '8px 16px',
+									margin: '8px 0',
+									background: colorBgLayout,
+									borderRadius: '6px',
+									fontSize: '12px',
+									color: '#666',
+									display: collapsed ? 'none' : 'block',
+								}}
+							>
+								<div style={{ marginBottom: '8px', fontWeight: 500 }}>English Analysis服务状态</div>
+								<div style={{ color: getEnglishAnalysisStatusInfo().color, marginBottom: '8px' }}>
+									{englishAnalysisStatus === 'starting' && <LoadingOutlined style={{ marginRight: '4px' }} />}
+									{getEnglishAnalysisStatusInfo().text}
+								</div>
+								<div style={{ display: 'flex', gap: '4px' }}>
+									{englishAnalysisStatus === 'running' ? (
+										<Button
+											size="small"
+											type="default"
+											icon={<StopOutlined />}
+											onClick={stopEnglishAnalysisService}
+											style={{ fontSize: '11px', height: '24px' }}
+										>
+											停止
+										</Button>
+									) : (
+										<Button
+											size="small"
+											type="primary"
+											icon={<PlayCircleOutlined />}
+											onClick={startEnglishAnalysisService}
+											loading={englishAnalysisStatus === 'starting'}
+											style={{ fontSize: '11px', height: '24px' }}
+										>
+											启动
+										</Button>
+									)}
+									<Button
+										size="small"
+										type="text"
+										onClick={checkEnglishAnalysisStatus}
 										style={{ fontSize: '11px', height: '24px', padding: '0 4px' }}
 									>
 										刷新
