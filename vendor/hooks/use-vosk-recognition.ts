@@ -38,6 +38,42 @@ export function useVoskRecognition({
   const maxRetries = 3;
   const retryDelay = 1000; // 1秒基础延迟
   
+  // 添加防抖机制，避免状态频繁切换导致闪烁
+  const statusUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastErrorTimeRef = useRef<number>(0);
+  const ERROR_DEBOUNCE_TIME = 2000; // 2秒内的重复错误不更新状态
+  
+  // 防抖的错误设置函数
+  const setErrorDebounced = useCallback((errorMsg: string | null) => {
+    const now = Date.now();
+    
+    // 如果是清除错误（errorMsg 为 null），直接设置
+    if (errorMsg === null) {
+      if (statusUpdateTimeoutRef.current) {
+        clearTimeout(statusUpdateTimeoutRef.current);
+        statusUpdateTimeoutRef.current = null;
+      }
+      setError(null);
+      return;
+    }
+    
+    // 如果距离上次错误时间小于防抖时间，则延迟设置
+    if (now - lastErrorTimeRef.current < ERROR_DEBOUNCE_TIME) {
+      if (statusUpdateTimeoutRef.current) {
+        clearTimeout(statusUpdateTimeoutRef.current);
+      }
+      
+      statusUpdateTimeoutRef.current = setTimeout(() => {
+        setError(errorMsg);
+        lastErrorTimeRef.current = Date.now();
+      }, ERROR_DEBOUNCE_TIME);
+    } else {
+      // 立即设置错误
+      setError(errorMsg);
+      lastErrorTimeRef.current = now;
+    }
+  }, []);
+  
   const audioContextRef = useRef<AudioContext | null>(null);
   // 为一次对话（turn）维持一个会话ID，供后端按会话累积识别并在结束时输出 FinalResult
   const sessionIdRef = useRef<string | null>(null);
@@ -74,7 +110,7 @@ export function useVoskRecognition({
     } catch (err) {
       const errorMsg = `Python Vosk 服务连接失败: ${err instanceof Error ? err.message : String(err)}`;
       console.error('❌', errorMsg);
-      setError(errorMsg);
+      setErrorDebounced(errorMsg);
       if (onError) {
         onError(errorMsg);
       }
@@ -89,7 +125,7 @@ export function useVoskRecognition({
     try {
       console.log('🎤 开始初始化 Python Vosk 服务连接...');
       setIsLoading(true);
-      setError(null);
+      setErrorDebounced(null);
       
       const isHealthy = await checkServiceHealth();
       
@@ -103,7 +139,7 @@ export function useVoskRecognition({
       
     } catch (err) {
       const errorMsg = `Failed to initialize Python Vosk service: ${err instanceof Error ? err.message : String(err)}`;
-      setError(errorMsg);
+      setErrorDebounced(errorMsg);
       setIsLoading(false);
       if (onError) {
         onError(errorMsg);
@@ -249,7 +285,7 @@ export function useVoskRecognition({
       }
       
       const errorMsg = `Audio processing error: ${err instanceof Error ? err.message : String(err)}`;
-      setError(errorMsg);
+      setErrorDebounced(errorMsg);
       setIsReconnecting(false);
       if (onError) {
         onError(errorMsg);
@@ -315,6 +351,12 @@ export function useVoskRecognition({
   
   // 清理资源
   const cleanup = useCallback(() => {
+    // 清理防抖定时器
+    if (statusUpdateTimeoutRef.current) {
+      clearTimeout(statusUpdateTimeoutRef.current);
+      statusUpdateTimeoutRef.current = null;
+    }
+    
     if (audioContextRef.current) {
       try {
         audioContextRef.current.close();
@@ -325,9 +367,9 @@ export function useVoskRecognition({
     }
     
     setIsReady(false);
-    setError(null);
+    setErrorDebounced(null);
     sessionIdRef.current = null;
-  }, []);
+  }, [setErrorDebounced]);
   
   // 重置识别器
   const resetRecognizer = useCallback(async () => {
