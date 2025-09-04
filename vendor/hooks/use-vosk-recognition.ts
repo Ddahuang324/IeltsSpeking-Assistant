@@ -33,6 +33,10 @@ export function useVoskRecognition({
   const [isLoading, setIsLoading] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [isReconnecting, setIsReconnecting] = useState(false);
+  const maxRetries = 3;
+  const retryDelay = 1000; // 1秒基础延迟
   
   const audioContextRef = useRef<AudioContext | null>(null);
   // 为一次对话（turn）维持一个会话ID，供后端按会话累积识别并在结束时输出 FinalResult
@@ -189,7 +193,8 @@ export function useVoskRecognition({
           'Content-Type': 'application/octet-stream',
           'X-Session-Id': sessionId,
         },
-        body: float32Array.buffer
+        body: float32Array.buffer,
+        signal: AbortSignal.timeout(10000) // 10秒超时
       });
       
       if (!response.ok) {
@@ -198,6 +203,10 @@ export function useVoskRecognition({
       
       const result = await response.json();
       console.log('🎤 Python Vosk 识别结果:', result);
+      
+      // 重置重试计数器
+      setRetryCount(0);
+      setIsReconnecting(false);
       
       if (result.success) {
         if (result.type === 'final' && result.text && result.text.trim()) {
@@ -218,9 +227,30 @@ export function useVoskRecognition({
       }
       
     } catch (err) {
-      const errorMsg = `Audio processing error: ${err instanceof Error ? err.message : String(err)}`;
       console.error('❌ Python Vosk 处理音频数据错误:', err);
+      
+      // 检查是否为网络错误且可以重试
+      const isNetworkError = err instanceof TypeError || 
+                            (err as any)?.name === 'AbortError' ||
+                            (err as any)?.status >= 500;
+      
+      if (isNetworkError && retryCount < maxRetries) {
+        setIsReconnecting(true);
+        setRetryCount(prev => prev + 1);
+        
+        console.log(`🔄 网络错误，准备重试 (${retryCount + 1}/${maxRetries})`);
+        
+        // 指数退避重试
+        setTimeout(() => {
+          processAudioData(audioData, sampleRate);
+        }, retryDelay * Math.pow(2, retryCount));
+        
+        return;
+      }
+      
+      const errorMsg = `Audio processing error: ${err instanceof Error ? err.message : String(err)}`;
       setError(errorMsg);
+      setIsReconnecting(false);
       if (onError) {
         onError(errorMsg);
       }
@@ -248,6 +278,7 @@ export function useVoskRecognition({
         },
         // 允许空body
         body: new Uint8Array(0),
+        signal: AbortSignal.timeout(10000) // 10秒超时
       });
       if (!resp.ok) {
         throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
@@ -259,8 +290,22 @@ export function useVoskRecognition({
         if (text && onResult) onResult(text);
       }
     } catch (e) {
-      const msg = `Flush error: ${e instanceof Error ? e.message : String(e)}`;
       console.warn('⚠️ Vosk 会话结束错误:', e);
+      
+      // 对于flush操作，如果是网络错误，尝试重试一次
+      const isNetworkError = e instanceof TypeError || 
+                            (e as any)?.name === 'AbortError' ||
+                            (e as any)?.status >= 500;
+      
+      if (isNetworkError && !flushingRef.current) {
+        console.log('🔄 Flush网络错误，尝试重试一次');
+        setTimeout(() => {
+          flush();
+        }, 1000);
+        return;
+      }
+      
+      const msg = `Flush error: ${e instanceof Error ? e.message : String(e)}`;
       if (onError) onError(msg);
     } finally {
       flushingRef.current = false;
@@ -322,5 +367,9 @@ export function useVoskRecognition({
     flush,
     isReady,
     error,
+    isReconnecting,
+    retryCount,
+    cleanup,
+    resetRecognizer,
   } as const;
 }

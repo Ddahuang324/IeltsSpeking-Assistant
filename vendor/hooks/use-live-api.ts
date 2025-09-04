@@ -47,6 +47,12 @@ export type UseLiveAPIResults = {
   micTranscribedText: string;
   audioRecorder: AudioRecorder | null;
   audioStreamer: AudioStreamer | null;
+  voskStatus: {
+    isReady: boolean;
+    isReconnecting: boolean;
+    retryCount: number;
+    error: string | null;
+  };
 };
 
 export function useLiveAPI({
@@ -81,47 +87,97 @@ export function useLiveAPI({
     enabled: outputMode === 'audio_text' && speechToTextEnabled 
   });
   
-  const { processAudioData, flush, isReady, error } = useVoskRecognition({
+  const { processAudioData, flush, isReady, error, isReconnecting, retryCount } = useVoskRecognition({
     enabled: outputMode === 'audio_text' && speechToTextEnabled,
     onResult: (text: string) => {
       console.log('🎯 Vosk 最终结果:', text);
-      setTranscribedText(''); // 清空实时缓冲区，避免停留
-      // 将最终转写结果作为一条 ServerContentMessage 推入，便于在聊天历史中记录
-      setCurrentTranscriptMessage({
-        serverContent: {
-          modelTurn: {
-            parts: [{ text }],
+      // 确保转写结果不为空且有意义
+      if (text && text.trim().length > 0) {
+        setTranscribedText(''); // 清空实时缓冲区，避免停留
+        // 将最终转写结果作为一条 ServerContentMessage 推入，便于在聊天历史中记录
+        setCurrentTranscriptMessage({
+          serverContent: {
+            modelTurn: {
+              parts: [{ text: text.trim() }],
+            },
           },
-        },
-        id: nanoid(),
-      });
+          id: nanoid(),
+        });
+      }
     },
     onPartialResult: (text: string) => {
       console.log('🎤 Vosk 部分结果:', text);
-      setTranscribedText(text); // 显示部分结果
+      // 只有在有意义的部分结果时才更新
+      if (text && text.trim().length > 0) {
+        setTranscribedText(text.trim()); // 显示部分结果
+      }
     },
     onError: (error: string) => {
       console.error('❌ Vosk 错误:', error);
+      // 网络错误时不清空已有的转写文本
+      if (!error.includes('network') && !error.includes('timeout')) {
+        setTranscribedText('');
+      }
     }
   });
   
   console.log('🔧 useLiveAPI - Vosk状态:', { isReady, error, hasProcessAudioData: !!processAudioData });
+  
+  // 添加超时机制处理遗留的转写内容
+  useEffect(() => {
+    if (!transcribedText || transcribedText.trim().length === 0) {
+      return;
+    }
+    
+    // 设置5秒超时，如果转写内容长时间没有更新，自动创建bot消息
+    const timeoutId = setTimeout(() => {
+      if (transcribedText && transcribedText.trim().length > 0) {
+        console.log('⏰ 转写内容超时，自动创建bot消息:', transcribedText);
+        setCurrentTranscriptMessage({
+          serverContent: {
+            modelTurn: {
+              parts: [{ text: transcribedText.trim() }],
+            },
+          },
+          id: nanoid(),
+        });
+        setTranscribedText(''); // 清空缓冲区
+      }
+    }, 5000); // 5秒超时
+    
+    return () => clearTimeout(timeoutId);
+  }, [transcribedText]);
   // 麦克风->Vosk 识别（基于 RealtimeInput 的音频块）
   const { feedBase64: feedMicBase64, flush: flushMic, isReady: micReady, partialText: micPartial } = useMicVosk({
     enabled: speechToTextEnabled,
-    onPartial: (t) => setMicTranscribedText(t),
-    onResult: (t) => {
-      setMicTranscribedText('');
-      // 将最终识别文本作为一条用户消息（右侧头像）加入历史
-      setCurrentUserMessage({
-        clientContent: {
-          turns: [{ role: 'user', parts: [{ text: t }] } as any],
-          turnComplete: true,
-        },
-        id: nanoid(),
-      });
+    onPartial: (t) => {
+      // 只有在有意义的部分结果时才更新
+      if (t && t.trim().length > 0) {
+        setMicTranscribedText(t.trim());
+      }
     },
-    onError: (err) => console.error('[Mic->Vosk] error:', err),
+    onResult: (t) => {
+      console.log('🎤 麦克风Vosk最终结果:', t);
+      setMicTranscribedText('');
+      // 确保识别结果不为空且有意义
+      if (t && t.trim().length > 0) {
+        // 将最终识别文本作为一条用户消息（右侧头像）加入历史
+        setCurrentUserMessage({
+          clientContent: {
+            turns: [{ role: 'user', parts: [{ text: t.trim() }] } as any],
+            turnComplete: true,
+          },
+          id: nanoid(),
+        });
+      }
+    },
+    onError: (err) => {
+      console.error('[Mic->Vosk] error:', err);
+      // 网络错误时不清空已有的转写文本
+      if (!err.includes('network') && !err.includes('timeout')) {
+        setMicTranscribedText('');
+      }
+    },
   });
   const micFlushTimerRef = useRef<number | null>(null);
   // 新增：机器人音频的静默定时器，用于触发分段 flush
@@ -376,5 +432,12 @@ export function useLiveAPI({
     micTranscribedText,
     audioRecorder: audioRecorderRef.current,
     audioStreamer: audioStreamerRef.current,
+    // 网络状态监控
+    voskStatus: {
+      isReady,
+      isReconnecting,
+      retryCount,
+      error,
+    },
   };
 }

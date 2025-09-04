@@ -33,8 +33,14 @@ export function useMicVosk({
 }: UseMicVoskOptions = {}): UseMicVoskResult {
   const [internalEnabled, setInternalEnabled] = useState<boolean>(enabled);
   const [partialText, setPartialText] = useState<string>('');
+  
+  // 音频缓冲队列
+  const audioBufferRef = useRef<Array<{ buffer: ArrayBuffer; timestamp: number }>>([]);
+  const isProcessingRef = useRef<boolean>(false);
+  const maxBufferSize = 50; // 最大缓冲50个音频块
+  const bufferTimeout = 5000; // 5秒后清理过期缓冲
 
-  const { processAudioData, flush: voskFlush, isReady } = useVoskRecognition({
+  const { processAudioData, flush: voskFlush, isReady, isReconnecting } = useVoskRecognition({
     enabled: internalEnabled,
     serviceUrl,
     onPartialResult: (t) => {
@@ -47,6 +53,43 @@ export function useMicVosk({
     },
     onError,
   });
+  
+  // 处理缓冲队列
+  const processBufferQueue = useCallback(async () => {
+    if (isProcessingRef.current || !isReady || isReconnecting) return;
+    
+    isProcessingRef.current = true;
+    
+    try {
+      while (audioBufferRef.current.length > 0 && isReady && !isReconnecting) {
+        const audioItem = audioBufferRef.current.shift();
+        if (!audioItem) break;
+        
+        // 检查音频数据是否过期（超过5秒）
+        if (Date.now() - audioItem.timestamp > bufferTimeout) {
+          console.log('🗑️ 丢弃过期音频数据');
+          continue;
+        }
+        
+        await processAudioData?.(audioItem.buffer, 16000);
+        
+        // 添加小延迟避免过快处理
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+    } catch (error) {
+      console.error('❌ 处理音频缓冲队列错误:', error);
+    } finally {
+      isProcessingRef.current = false;
+    }
+  }, [isReady, isReconnecting, processAudioData]);
+  
+  // 当网络恢复时处理缓冲队列
+  useEffect(() => {
+    if (isReady && !isReconnecting && audioBufferRef.current.length > 0) {
+      console.log(`🔄 网络恢复，处理缓冲队列 (${audioBufferRef.current.length} 个音频块)`);
+      processBufferQueue();
+    }
+  }, [isReady, isReconnecting, processBufferQueue]);
 
   useEffect(() => {
     setInternalEnabled(enabled);
@@ -54,16 +97,37 @@ export function useMicVosk({
 
   const feedBase64 = useCallback(
     (base64: string) => {
-      if (!internalEnabled || !isReady) return;
+      if (!internalEnabled) return;
+      
       try {
         const buffer = base64ToArrayBuffer(base64);
-        // 麦克风是 16kHz PCM16 mono
-        processAudioData?.(buffer, 16000);
+        
+        // 如果服务准备好且没有重连，直接处理
+        if (isReady && !isReconnecting && !isProcessingRef.current) {
+          processAudioData?.(buffer, 16000);
+        } else {
+          // 否则加入缓冲队列
+          const audioItem = { buffer, timestamp: Date.now() };
+          audioBufferRef.current.push(audioItem);
+          
+          // 限制缓冲队列大小
+          if (audioBufferRef.current.length > maxBufferSize) {
+            const removed = audioBufferRef.current.shift();
+            console.log('🗑️ 缓冲队列已满，丢弃最旧的音频数据');
+          }
+          
+          console.log(`📦 音频数据已缓冲 (队列长度: ${audioBufferRef.current.length})`);
+          
+          // 如果服务准备好，尝试处理队列
+          if (isReady && !isReconnecting) {
+            processBufferQueue();
+          }
+        }
       } catch (e) {
         onError?.(`feedBase64 error: ${e instanceof Error ? e.message : String(e)}`);
       }
     },
-    [internalEnabled, isReady, processAudioData, onError]
+    [internalEnabled, isReady, isReconnecting, processAudioData, onError, processBufferQueue]
   );
 
   const flush = useCallback(() => {

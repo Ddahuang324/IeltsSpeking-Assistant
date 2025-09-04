@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { UserOutlined, RobotOutlined } from '@ant-design/icons';
-import { PauseCircleOutlined, PoweroffOutlined, AudioOutlined, StopOutlined, DownloadOutlined } from '@ant-design/icons';
+import { PauseCircleOutlined, PoweroffOutlined, AudioOutlined, StopOutlined, DownloadOutlined, WifiOutlined, DisconnectOutlined, LoadingOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import MediaButtons from '@/components/media-buttons';
 import { useLiveAPIContext } from '@/vendor/contexts/LiveAPIContext';
 import {
@@ -202,6 +202,7 @@ const LivePage: React.FC = () => {
 		setSpeechToTextEnabled,
 		audioRecorder,
 		audioStreamer,
+		voskStatus,
 	} = useLiveAPIContext();
 
 	// 录制功能
@@ -634,9 +635,45 @@ const LivePage: React.FC = () => {
 								}}
 							>
 								<Flex justify='space-between' align='center'>
-									<span style={{ fontSize: '14px', color: '#666' }}>
-										对话历史 ({messages.filter(m => m !== null).length} 条消息)
-									</span>
+									<Flex align='center' gap={16}>
+										<span style={{ fontSize: '14px', color: '#666' }}>
+											对话历史 ({messages.filter(m => m !== null).length} 条消息)
+										</span>
+										{/* Vosk网络状态指示器 */}
+										{outPut === 'audio_text' && (
+											<Flex align='center' gap={4}>
+												{voskStatus.isReconnecting ? (
+													<>
+														<LoadingOutlined style={{ color: '#faad14' }} />
+														<span style={{ fontSize: '12px', color: '#faad14' }}>
+															重连中 ({voskStatus.retryCount})
+														</span>
+													</>
+												) : voskStatus.error ? (
+													<>
+														<ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />
+														<span style={{ fontSize: '12px', color: '#ff4d4f' }} title={voskStatus.error}>
+															转写异常
+														</span>
+													</>
+												) : voskStatus.isReady ? (
+													<>
+														<WifiOutlined style={{ color: '#52c41a' }} />
+														<span style={{ fontSize: '12px', color: '#52c41a' }}>
+															转写正常
+														</span>
+													</>
+												) : (
+													<>
+														<DisconnectOutlined style={{ color: '#d9d9d9' }} />
+														<span style={{ fontSize: '12px', color: '#d9d9d9' }}>
+															转写未连接
+														</span>
+													</>
+												)}
+											</Flex>
+										)}
+									</Flex>
 									<ChatExport messages={messages} disabled={!connected} />
 								</Flex>
 							</div>
