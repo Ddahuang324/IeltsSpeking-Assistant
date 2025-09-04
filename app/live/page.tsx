@@ -35,9 +35,6 @@ import { Part } from '@google/generative-ai';
 const { Header, Content } = Layout;
 
 interface ToolsState {
-	codeExecution: boolean;
-	functionCalling: boolean;
-	automaticFunctionResponse: boolean;
 	grounding: boolean;
 	speechToText: boolean;
 }
@@ -244,13 +241,111 @@ const LivePage: React.FC = () => {
 
 	const [tools, setTools] = useLocalStorageState<ToolsState>('tools', {
 		defaultValue: {
-			codeExecution: false,
-			functionCalling: false,
-			automaticFunctionResponse: false,
 			grounding: false,
 			speechToText: true,
 		},
 	});
+
+	// Vosk服务状态管理
+	const [voskServiceStatus, setVoskServiceStatus] = useState<'running' | 'stopped' | 'checking'>('checking');
+	const [voskServiceProcess, setVoskServiceProcess] = useState<string | null>(null);
+
+	// 检查Vosk服务状态
+	const checkVoskServiceStatus = async () => {
+		try {
+			setVoskServiceStatus('checking');
+			const response = await fetch('http://localhost:5001/health');
+			if (response.ok) {
+				setVoskServiceStatus('running');
+			} else {
+				setVoskServiceStatus('stopped');
+			}
+		} catch (error) {
+			setVoskServiceStatus('stopped');
+		}
+	};
+
+	// 启动Vosk服务
+	const startVoskService = async () => {
+		try {
+			setVoskServiceStatus('checking');
+			
+			// 创建一个新的终端来运行Python服务
+			const response = await fetch('/api/vosk/start', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+			});
+			
+			if (response.ok) {
+				const data = await response.json();
+				setVoskServiceProcess(data.processId);
+				// 等待一下再检查状态
+				setTimeout(() => {
+					checkVoskServiceStatus();
+				}, 2000);
+				Modal.success({
+					title: '启动成功',
+					content: 'Vosk服务正在启动中...',
+					okText: '好的',
+				});
+			} else {
+				throw new Error('启动失败');
+			}
+		} catch (error) {
+			console.error('启动Vosk服务失败:', error);
+			setVoskServiceStatus('stopped');
+			Modal.error({
+				title: '启动失败',
+				content: '请确保Python环境已安装并且vosk_service.py文件存在',
+				okText: '好的',
+			});
+		}
+	};
+
+	// 停止Vosk服务
+	const stopVoskService = async () => {
+		try {
+			setVoskServiceStatus('checking');
+			
+			const response = await fetch('/api/vosk/stop', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ processId: voskServiceProcess }),
+			});
+			
+			if (response.ok) {
+				setVoskServiceProcess(null);
+				setVoskServiceStatus('stopped');
+				Modal.success({
+					title: '停止成功',
+					content: 'Vosk服务已停止',
+					okText: '好的',
+				});
+			} else {
+				throw new Error('停止失败');
+			}
+		} catch (error) {
+			console.error('停止Vosk服务失败:', error);
+			Modal.error({
+				title: '停止失败',
+				content: '无法停止Vosk服务，请手动终止进程',
+				okText: '好的',
+			});
+			// 重新检查状态
+			checkVoskServiceStatus();
+		}
+	};
+
+	// 定期检查Vosk服务状态
+	useEffect(() => {
+		checkVoskServiceStatus();
+		const interval = setInterval(checkVoskServiceStatus, 5000); // 每5秒检查一次
+		return () => clearInterval(interval);
+	}, []);
 
 	// 同步语音转文字设置
 	useEffect(() => {
@@ -689,53 +784,6 @@ const LivePage: React.FC = () => {
 											paddingInlineStart: 24,
 										}}
 									>
-										<FieldItem label='Code Execution'>
-											<Checkbox
-												onChange={(e) => {
-													if (tools) {
-														setTools({
-															...tools,
-															codeExecution:
-																e.target
-																	.checked,
-														});
-													}
-												}}
-												checked={tools?.codeExecution}
-											/>
-										</FieldItem>
-										<FieldItem label='Function calling'>
-											<Checkbox
-												onChange={(e) => {
-													if (tools) {
-														setTools({
-															...tools,
-															functionCalling:
-																e.target
-																	.checked,
-														});
-													}
-												}}
-												checked={tools?.functionCalling}
-											/>
-										</FieldItem>
-										<FieldItem label='Automatic Function Response'>
-											<Checkbox
-												onChange={(e) => {
-													if (tools) {
-														setTools({
-															...tools,
-															automaticFunctionResponse:
-																e.target
-																	.checked,
-														});
-													}
-												}}
-												checked={
-													tools?.automaticFunctionResponse
-												}
-											/>
-										</FieldItem>
 										<FieldItem label='Grounding'>
 												<Checkbox
 													onChange={(e) => {
@@ -751,47 +799,79 @@ const LivePage: React.FC = () => {
 													checked={tools?.grounding}
 												/>
 											</FieldItem>
-											<FieldItem label='Speech to Text (Audio+Text mode)'>
-															<Flex gap={8} align="center">
-																<Checkbox
-																	onChange={(e) => {
-																		const checked = e.target.checked;
-																		if (tools) {
-																			setTools({
-																				...tools,
-																				speechToText: checked,
-																			});
-																			setSpeechToTextEnabled(checked);
-																		}
-																	}}
-																	checked={tools?.speechToText}
-																	disabled={outPut !== 'audio_text'}
-																/>
-																<Button 
-																	size="small" 
-																	onClick={() => {
-																		console.log('🔍 调试信息:', {
-																			outPut,
-																			speechToTextEnabled: tools?.speechToText,
-																			transcribedText,
-																			connected
-																		});
-																	}}
-																>
-																	调试
-																</Button>
-															</Flex>
-														</FieldItem>
+												<FieldItem label='Speech to Text '>
+									<Checkbox
+										onChange={(e) => {
+											const checked = e.target.checked;
+											if (tools) {
+												setTools({
+													...tools,
+													speechToText: checked,
+												});
+												setSpeechToTextEnabled(checked);
+											}
+										}}
+										checked={tools?.speechToText}
+										disabled={outPut !== 'audio_text'}
+									/>
+								</FieldItem>
 									</Flex>
 								),
 								style: panelStyle,
 							},
 						]}
 					/>
-				</Flex>
+				{/* Vosk服务状态控制 - 独立于Tools区域 */}
+				<div
+					style={{
+						marginTop: 16,
+						padding: '12px 16px',
+						border: '1px solid #d9d9d9',
+						borderRadius: 6,
+						background: colorBgContainer,
+					}}
+				>
+					<div
+						style={{
+							fontSize: 14,
+							fontWeight: 500,
+							marginBottom: 8,
+						}}
+					>
+						Vosk服务状态
+					</div>
+					<Flex gap={8} align="center">
+						<Tag 
+							color={
+								voskServiceStatus === 'running' ? 'green' : 
+								voskServiceStatus === 'stopped' ? 'red' : 'orange'
+							}
+						>
+							{voskServiceStatus === 'running' ? '运行中' : 
+							 voskServiceStatus === 'stopped' ? '已停止' : '检查中'}
+						</Tag>
+						<Button 
+							size="small"
+							type={voskServiceStatus === 'running' ? 'default' : 'primary'}
+							icon={voskServiceStatus === 'running' ? <PauseCircleOutlined /> : <PoweroffOutlined />}
+							onClick={voskServiceStatus === 'running' ? stopVoskService : startVoskService}
+							loading={voskServiceStatus === 'checking'}
+						>
+							{voskServiceStatus === 'running' ? '停止' : '启动'}
+						</Button>
+						<Button 
+							size="small"
+							onClick={checkVoskServiceStatus}
+							loading={voskServiceStatus === 'checking'}
+						>
+							刷新
+						</Button>
+					</Flex>
+				</div>
 			</Flex>
-		</Layout>
-	);
+		</Flex>
+	</Layout>
+);
 };
 
 export default LivePage;
