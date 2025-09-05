@@ -29,7 +29,7 @@ session_closed = set()
 request_count = 0  # 请求计数器，用于定期重置识别器
 
 # 模型路径
-MODEL_PATH = "./public/models/vosk-model-en-us-0.22-lgraph 2"
+MODEL_PATH = "./public/models/vosk-model-small-en-us-0.15"
 
 def init_vosk_model():
     """初始化 Vosk 模型"""
