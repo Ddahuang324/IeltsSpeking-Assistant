@@ -43,9 +43,18 @@ const { Panel } = Collapse;
 // 雅思口语分析结果接口
 interface IELTSAnalysisResult {
 	overall_feedback: {
-		strengths: string[];
-		areas_for_improvement: string[];
-		key_recommendations: string[];
+		strengths: Array<{
+			point: string;
+			example: string;
+		}>;
+		areas_for_improvement: Array<{
+			point: string;
+			example: string;
+		}>;
+		key_recommendations: Array<{
+			point: string;
+			example: string;
+		}>;
 	};
 	ielts_band_score: {
 		fluency_and_coherence: {
@@ -60,7 +69,7 @@ interface IELTSAnalysisResult {
 			score: number;
 			rationale: string;
 		};
-		pronunciation_assumption: {
+		pronunciation: {
 			score: number;
 			rationale: string;
 		};
@@ -71,40 +80,39 @@ interface IELTSAnalysisResult {
 	};
 	grammar_errors: Array<{
 		type: string;
+		original_sentence: string;
 		text: string;
 		description: string;
 		suggestions: string[];
 	}>;
 	word_choice_issues: Array<{
 		type: string;
+		original_sentence: string;
 		text: string;
 		suggestion: string;
 	}>;
-	tense_consistency: {
-		analysis: string;
-	};
-	sentence_structure: {
-		analysis: string;
-		issues: Array<{
-			sentence: string;
-			issue: string;
-		}>;
-	};
 	vocabulary_assessment: {
-		lexical_density: number;
 		advanced_words_found: string[];
-		overused_basic_words: string[];
 		vocabulary_suggestions: Array<{
-			basic_word: string;
-			alternatives: string[];
+			overused_word: string;
+			original_sentence: string;
+			suggested_rewrites: string[];
 		}>;
 	};
 	fluency_markers: {
+		analysis: string;
 		hesitation_markers: Array<{
 			marker: string;
 			count: number;
 		}>;
 		connectors_used: string[];
+	};
+	pronunciation_analysis: {
+		analysis: string;
+		potential_patterns: Array<{
+			suspected_issue: string;
+			evidence: string[];
+		}>;
 	};
 	analysis_timestamp?: number;
 	analysis_duration_seconds?: number;
@@ -363,13 +371,21 @@ const IELTSPage: React.FC = () => {
 														key="1"
 													>
 														<List
-															dataSource={result.overall_feedback.strengths}
-															renderItem={(item) => (
-																<List.Item>
-																	<Text><CheckCircleOutlined style={{ color: '#52c41a', marginRight: 8 }} />{item}</Text>
-																</List.Item>
-															)}
-														/>
+																				dataSource={result.overall_feedback.strengths}
+																				renderItem={(item) => (
+																					<List.Item>
+																						<div>
+																							<Text><CheckCircleOutlined style={{ color: '#52c41a', marginRight: 8 }} />{item.point}</Text>
+																							{item.example && (
+																								<div style={{ marginTop: 4, marginLeft: 24 }}>
+																									<Text type="secondary" style={{ fontStyle: 'italic' }}>例子: &quot;{item.example}&quot;</Text>
+																								</div>
+																							)}
+
+																						</div>
+																					</List.Item>
+																				)}
+																			/>
 													</Panel>
 													<Panel 
 														header={
@@ -381,13 +397,20 @@ const IELTSPage: React.FC = () => {
 														key="2"
 													>
 														<List
-															dataSource={result.overall_feedback.areas_for_improvement}
-															renderItem={(item) => (
-																<List.Item>
-																	<Text><ExclamationCircleOutlined style={{ color: '#faad14', marginRight: 8 }} />{item}</Text>
-																</List.Item>
-															)}
-														/>
+																				dataSource={result.overall_feedback.areas_for_improvement}
+																				renderItem={(item) => (
+																					<List.Item>
+																						<div>
+																							<Text><ExclamationCircleOutlined style={{ color: '#faad14', marginRight: 8 }} />{item.point}</Text>
+																							{item.example && (
+																								<div style={{ marginTop: 4, marginLeft: 24 }}>
+																									<Text type="secondary" style={{ fontStyle: 'italic' }}>例子: &quot;{item.example}&quot;</Text>
+																								</div>
+																							)}
+																						</div>
+																					</List.Item>
+																				)}
+																			/>
 													</Panel>
 													<Panel 
 														header={
@@ -399,13 +422,20 @@ const IELTSPage: React.FC = () => {
 														key="3"
 													>
 														<List
-															dataSource={result.overall_feedback.key_recommendations}
-															renderItem={(item) => (
-																<List.Item>
-																	<Text><BulbOutlined style={{ color: '#1890ff', marginRight: 8 }} />{item}</Text>
-																</List.Item>
-															)}
-														/>
+																				dataSource={result.overall_feedback.key_recommendations}
+																				renderItem={(item) => (
+																					<List.Item>
+																						<div>
+																							<Text><BulbOutlined style={{ color: '#1890ff', marginRight: 8 }} />{item.point}</Text>
+																							{item.example && (
+																								<div style={{ marginTop: 4, marginLeft: 24 }}>
+																									<Text type="secondary" style={{ fontStyle: 'italic' }}>例子: &quot;{item.example}&quot;</Text>
+																								</div>
+																							)}
+																						</div>
+																					</List.Item>
+																				)}
+																			/>
 													</Panel>
 												</Collapse>
 											</Card>
@@ -431,18 +461,32 @@ const IELTSPage: React.FC = () => {
 																			))}
 																		</Space>
 																	</Panel>
-																	{result.vocabulary_assessment.overused_basic_words && result.vocabulary_assessment.overused_basic_words.length > 0 && (
-																		<Panel 
-																			header={`过度使用的基础词汇 (${result.vocabulary_assessment.overused_basic_words.length}个)`} 
-																			key="2"
-																		>
-																			<Space wrap>
-																				{result.vocabulary_assessment.overused_basic_words.map((word, index) => (
-																					<Tag key={index} color="orange">{word}</Tag>
-																				))}
-																			</Space>
-																		</Panel>
-																	)}
+																	<Panel 
+																				header={`词汇建议 (${result.vocabulary_assessment.vocabulary_suggestions.length}个)`} 
+																				key="2"
+																			>
+																				<List
+																					dataSource={result.vocabulary_assessment.vocabulary_suggestions}
+																					renderItem={(suggestion) => (
+																						<List.Item>
+																							<div>
+																								<Text><Tag color="orange">{suggestion.overused_word}</Tag> 在句子中过度使用</Text>
+																								<div style={{ marginTop: 4, marginLeft: 8 }}>
+																									<Text type="secondary">原句: &quot;{suggestion.original_sentence}&quot;</Text>
+																								</div>
+																								<div style={{ marginTop: 4, marginLeft: 8 }}>
+																									<Text strong>建议改写: </Text>
+																									<Space wrap>
+																										{suggestion.suggested_rewrites.map((rewrite, index) => (
+																											<Tag key={index} color="green">{rewrite}</Tag>
+																										))}
+																									</Space>
+																								</div>
+																							</div>
+																						</List.Item>
+																					)}
+																				/>
+																			</Panel>
 																</Collapse>
 															</Card>
 
@@ -519,12 +563,13 @@ const IELTSPage: React.FC = () => {
 															<List.Item>
 																<Space direction="vertical" style={{ width: '100%' }}>
 																	<Flex justify="space-between" align="center">
-																		<Space>
-																			<Badge color={getErrorSeverityColor(error.type)} />
-																			<Text strong>&quot;{error.text}&quot;</Text>
-																			<Tag color={getErrorSeverityColor(error.type)}>{error.type}</Tag>
-																		</Space>
-																	</Flex>
+																							<Space>
+																								<Badge color={getErrorSeverityColor(error.type)} />
+																								<Text strong>&quot;{error.text}&quot;</Text>
+																								<Tag color={getErrorSeverityColor(error.type)}>{error.type}</Tag>
+																							</Space>
+																						</Flex>
+																						<Text type="secondary">原句: &quot;{error.original_sentence}&quot;</Text>
 																	<Text type="secondary">{error.description}</Text>
 																	{error.suggestions.length > 0 && (
 																		<div>
@@ -560,16 +605,60 @@ const IELTSPage: React.FC = () => {
 															<List.Item>
 																<Space direction="vertical" style={{ width: '100%' }}>
 																	<Flex justify="space-between" align="center">
-																		<Text strong>&quot;{issue.text}&quot;</Text>
-																		<Tag color="orange">{issue.type}</Tag>
-																	</Flex>
+																							<Text strong>&quot;{issue.text}&quot;</Text>
+																							<Tag color="orange">{issue.type}</Tag>
+																						</Flex>
+																						<Text type="secondary">原句: &quot;{issue.original_sentence}&quot;</Text>
 																	<Text type="secondary">{issue.suggestion}</Text>
-																</Space>
-															</List.Item>
-														)}
-													/>
-												</Card>
-											)}
+																					</Space>
+																				</List.Item>
+																			)}
+																		/>
+																	</Card>
+																)}
+
+																{/* 发音分析 */}
+																<Card 
+																	title={
+																		<Space>
+																			<SoundOutlined style={{ color: '#722ed1' }} />
+																			发音分析
+																		</Space>
+																	}
+																	size="small"
+																>
+																	<Space direction="vertical" style={{ width: '100%' }}>
+																		<div>
+																			<Text strong>分析结果:</Text>
+																			<div style={{ marginTop: 8 }}>
+																				<Text>{result.pronunciation_analysis.analysis}</Text>
+																			</div>
+																		</div>
+																		{result.pronunciation_analysis.potential_patterns.length > 0 && (
+																			<div>
+																				<Text strong>潜在发音模式:</Text>
+																				<List
+																					dataSource={result.pronunciation_analysis.potential_patterns}
+																					renderItem={(pattern) => (
+																						<List.Item>
+																							<div>
+																								<Text><Tag color="purple">{pattern.suspected_issue}</Tag></Text>
+																								<div style={{ marginTop: 4, marginLeft: 8 }}>
+																									<Text strong>证据: </Text>
+																									<Space wrap>
+																										{pattern.evidence.map((evidence, index) => (
+																											<Text key={index} type="secondary" style={{ fontStyle: 'italic' }}>&quot;{evidence}&quot;</Text>
+																										))}
+																									</Space>
+																								</div>
+																							</div>
+																						</List.Item>
+																					)}
+																				/>
+																			</div>
+																		)}
+																	</Space>
+																</Card>
 
 
 										</Space>

@@ -20,3 +20,13 @@ Candidate: Um... free time. I... uh... I like... watch movies. Yes, movies. It's
 Examiner: Why do you like watching movies?
 
 Candidate: Why? Um... because... it's... relaxing. Yes, relax. After work, I am... uh... tired. So I watch a movie. It makes me... feel good. And... er... I can see many things. New things. Like, different countries. It's... nice. So... um... it helps me to... to forget my work. Yeah. That's why. It's just... a good hobby. For me.
+
+-----------
+
+"Okay, uhm, I want to talk about... a historical place. I visited... like... two year ago. It is the Great Wall. The Great Wall are very famous in China. Many peoples go there every year. I go with my family. We was very exciting.
+
+When I stand on the wall, I feel... uh... very small. The wall is so long, you know. It go across mountains. So, uh, my father, he tell me many storys about it. He say it was builded a long, long time ago to... for protect the country. I sink it is a very great work. Peoples must be very tired when they build it.
+
+The view there is very good. You can see many trees and, uh, the sky is so blue. It's a good place for take photos. I take many photos. But it's also very crowd. So many peoples. Sometimes you can't walking fast.
+
+I think is important for children to visit this places. They can learning history. The history are important for our future. Uhm... yeah. I feel very proud of my country when I see it. It have a big affect on me. I hope I can go there again in future. So... that's all."

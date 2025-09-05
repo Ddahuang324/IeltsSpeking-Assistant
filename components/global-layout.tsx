@@ -26,8 +26,8 @@ function getItem(
 }
 
 const items: MenuItem[] = [
-	getItem('Stream Realtime', '/live', <AudioOutlined />),
-	getItem('雅思口语分析', '/ielts', <EditOutlined />),
+	getItem('Realtime Conversation', '/live', <AudioOutlined />),
+	getItem('English Analysis', '/ielts', <EditOutlined />),
 ];
 
 const subItems: MenuItem[] = [getItem('Github', '/github', <GithubOutlined />)];
@@ -259,7 +259,7 @@ const GlobalLayout: React.FC<{
 								}
 							)}
 						>
-							Gemini-Next-Web
+							Ielts Speaking Assistant
 						</div>
 						<div
 							className={clsx(
